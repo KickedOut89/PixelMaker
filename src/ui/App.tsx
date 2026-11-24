@@ -4,6 +4,7 @@ import { DEFAULT_PALETTE_ID, PALETTES } from '../core/palettes';
 import { createSprite } from '../core/sprite';
 import { Editor } from '../editor/editor';
 import { CanvasView } from './CanvasView';
+import { PaletteStrip } from './PaletteStrip';
 import { ToolRow } from './ToolRow';
 import { TopBar } from './TopBar';
 
@@ -34,6 +35,7 @@ export function App() {
       <main class="stage">
         <CanvasView editor={editor} />
       </main>
+      <PaletteStrip editor={editor} />
       <ToolRow editor={editor} />
     </div>
   );
