@@ -243,6 +243,13 @@ export class Editor {
     this.changed();
   }
 
+  renameSprite(name: string): void {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === this.state.sprite.name) return;
+    this.state.sprite.name = trimmed;
+    this.changed();
+  }
+
   setPalette(colors: Color[]): void {
     this.state.sprite.palette = [...colors];
     this.changed();

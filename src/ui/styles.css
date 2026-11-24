@@ -225,3 +225,34 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, select:focu
 .menu-item { display: block; width: 100%; min-height: 52px; text-align: left; border-radius: 8px; padding: 0 8px; }
 .menu-item:active { background: var(--panel-2); }
 .menu-item.danger { color: var(--danger); }
+
+.banner {
+  margin: 0;
+  padding: 8px 12px;
+  background: #4a3418;
+  color: #ffd9a0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.error { color: var(--danger); margin: 4px 0 8px; }
+.presets { display: flex; gap: 6px; margin-bottom: 10px; }
+.presets button {
+  flex: 1;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.presets button[aria-pressed='true'] { background: var(--bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.filename { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; text-align: right; }
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+.secondary {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-weight: 600;
+}
+.actions .primary { flex: 2; }

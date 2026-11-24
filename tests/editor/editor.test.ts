@@ -163,6 +163,14 @@ describe('state', () => {
     ed.setBrushSize(0);
     expect(ed.state.brushSize).toBe(1);
   });
+  test('renaming trims the name, ignores blanks and counts as a change', () => {
+    const r = ed.state.revision;
+    ed.renameSprite('  hero  ');
+    expect(ed.state.sprite.name).toBe('hero');
+    expect(ed.state.revision).toBeGreaterThan(r);
+    ed.renameSprite('   ');
+    expect(ed.state.sprite.name).toBe('hero');
+  });
   test('swapColors exchanges foreground and background', () => {
     ed.swapColors();
     expect(ed.state.fg).toBe(0xffffffff);
