@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { hsvToRgb, parseHex, rgbToHsv, rgba, toHex, unpack, type Color } from '../core/color';
 import { PALETTES } from '../core/palettes';
 import type { Editor } from '../editor/editor';
@@ -101,6 +101,10 @@ export function ColorPickerSheet({ open, initial, title, editor, onConfirm, onCl
   const hexDirty = useRef(false);
 
   const color = rgba(...hsvToRgb(hsv[0], hsv[1], hsv[2]), alpha);
+  // The chosen colour, updated the instant it changes. Rendering can lag a
+  // keystroke behind, so anything acting on "the current colour" reads this.
+  const latest = useRef<Color>(color);
+  const hexInput = useRef<HTMLInputElement>(null);
 
   const load = (c: Color, keepHue = hsv[0]) => {
     const [r, g, b, a] = unpack(c);
@@ -111,27 +115,35 @@ export function ColorPickerSheet({ open, initial, title, editor, onConfirm, onCl
     setAlpha(a);
     setHexText(toHex(c));
     hexDirty.current = false;
+    latest.current = c;
   };
   const update = (h: number, s: number, v: number, a: number) => {
     setHsv([h, s, v]);
     setAlpha(a);
-    setHexText(toHex(rgba(...hsvToRgb(h, s, v), a)));
+    latest.current = rgba(...hsvToRgb(h, s, v), a);
+    setHexText(toHex(latest.current));
     hexDirty.current = false;
   };
 
-  useEffect(() => {
+  // Before paint, so the reset can never land after the user's first keystroke.
+  useLayoutEffect(() => {
     if (open) {
       load(initial, 0);
       setPaletteId('');
     }
   }, [open, initial]);
 
-  const commitHex = () => {
+  const commitHex = (text: string) => {
     // Leaving the field by touching a slider must not undo that slider's change.
     if (!hexDirty.current) return;
-    const parsed = parseHex(hexText);
-    if (parsed === null) setHexText(toHex(color));
-    else load(parsed);
+    hexDirty.current = false;
+    const parsed = parseHex(text);
+    if (parsed === null) {
+      // Write the field directly as well: if the state never saw the bad text,
+      // setting it back is a no-op and the field would keep showing it.
+      if (hexInput.current) hexInput.current.value = toHex(latest.current);
+      setHexText(toHex(latest.current));
+    } else load(parsed);
   };
 
   const [pr, pg, pb] = hsvToRgb(hsv[0], hsv[1], hsv[2]);
@@ -152,11 +164,11 @@ export function ColorPickerSheet({ open, initial, title, editor, onConfirm, onCl
         </div>
         <label class="field">
           <span>Hex</span>
-          <input data-testid="hex" type="text" inputMode="text" autoCapitalize="off" autoComplete="off" spellcheck={false}
+          <input ref={hexInput} data-testid="hex" type="text" inputMode="text" autoCapitalize="off" autoComplete="off" spellcheck={false}
             maxLength={9} placeholder="#rrggbb" value={hexText}
             onInput={(e) => { hexDirty.current = true; setHexText((e.target as HTMLInputElement).value); }}
-            onBlur={commitHex}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitHex(); }} />
+            onBlur={(e) => commitHex((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitHex((e.target as HTMLInputElement).value); }} />
         </label>
       </div>
 
@@ -174,7 +186,11 @@ export function ColorPickerSheet({ open, initial, title, editor, onConfirm, onCl
         </select>
       </label>
 
-      <button class="primary" data-testid="color-ok" onClick={() => onConfirm(color)}>Use colour</button>
+      <button class="primary" data-testid="color-ok" onClick={() => {
+        // Apply a hex value that was typed but not yet confirmed with Enter.
+        const typed = hexDirty.current ? parseHex(hexInput.current?.value ?? '') : null;
+        onConfirm(typed ?? latest.current);
+      }}>Use colour</button>
     </BottomSheet>
   );
 }

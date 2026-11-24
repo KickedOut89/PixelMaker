@@ -33,6 +33,7 @@ test('a new sprite from a preset replaces the canvas and is remembered', async (
   await page.getByTestId('new-name').fill('coin');
   await page.getByTestId('preset-16').click();
   await page.getByTestId('new-create').click();
+  await expect(page.getByTestId('new-sheet')).toBeHidden();
   expect((await state(page, 'sprite')).width).toBe(16);
   expect(await paintedCount(page)).toBe(0);
   await expect(page.getByTestId('undo')).toBeDisabled();
@@ -55,6 +56,7 @@ test('new sprite sizes are clamped to 1..512', async ({ page }) => {
   await page.getByTestId('new-h').blur();
   await expect(page.getByTestId('new-h')).toHaveValue('1');
   await page.getByTestId('new-create').click();
+  await expect(page.getByTestId('new-sheet')).toBeHidden();
   const sprite = await state(page, 'sprite');
   expect([sprite.width, sprite.height]).toEqual([512, 1]);
 });
@@ -101,4 +103,24 @@ test('the app still works and says so when storage is unavailable', async ({ pag
   await expect(page.getByTestId('storage-warning')).toBeVisible();
   const canvas = (await page.getByTestId('canvas').boundingBox())!;
   expect(canvas.height / page.viewportSize()!.height).toBeGreaterThan(0.5);
+});
+
+test('new sprite does not silently throw away a drawing that could not be saved', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'indexedDB', {
+      value: { open() { throw new Error('storage is disabled'); } },
+    });
+  });
+  await openApp(page);
+  await drawLine(page, [2, 2], [6, 2]);
+  await page.getByTestId('menu').click();
+  await page.getByTestId('menu-new').click();
+  await page.getByTestId('preset-16').click();
+  await page.getByTestId('new-create').click();
+  await expect(page.getByTestId('new-unsaved')).toBeVisible();
+  expect((await state(page, 'sprite')).width).toBe(32);
+  expect(await paintedCount(page)).toBe(5);
+  await page.getByTestId('new-discard').click();
+  await expect(page.getByTestId('new-sheet')).toBeHidden();
+  expect((await state(page, 'sprite')).width).toBe(16);
 });

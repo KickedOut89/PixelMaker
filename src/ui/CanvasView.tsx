@@ -21,6 +21,9 @@ export function CanvasView({ editor }: { editor: Editor }) {
     let raf = 0;
     let paintedRevision = -1;
     let paintedSprite: unknown = null;
+    // Reused between frames so drawing does not churn memory.
+    let pixels: Uint8ClampedArray | undefined;
+    let image: ImageData | null = null;
 
     const draw = () => {
       raf = 0;
@@ -31,9 +34,13 @@ export function CanvasView({ editor }: { editor: Editor }) {
           off.width = sprite.width;
           off.height = sprite.height;
         }
-        const img = new ImageData(sprite.width, sprite.height);
-        img.data.set(compositeFrame(sprite, frame));
-        offCtx.putImageData(img, 0, 0);
+        if (!image || image.width !== sprite.width || image.height !== sprite.height) {
+          image = new ImageData(sprite.width, sprite.height);
+          pixels = undefined;
+        }
+        pixels = compositeFrame(sprite, frame, pixels);
+        image.data.set(pixels);
+        offCtx.putImageData(image, 0, 0);
         paintedRevision = revision;
         paintedSprite = sprite;
       }
@@ -154,6 +161,9 @@ export function CanvasView({ editor }: { editor: Editor }) {
     };
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // A new first finger while we still think one is down means its release
+      // never reached us. Start clean instead of treating this as a second finger.
+      if (e.isPrimary && gestures.active) gestures.reset();
       try {
         canvas.setPointerCapture(e.pointerId);
       } catch {
@@ -176,6 +186,13 @@ export function CanvasView({ editor }: { editor: Editor }) {
       editor.moveViewport(snapZoom(zoomAt(v, next / v.zoom, e.clientX - r.left, e.clientY - r.top), e.clientX - r.left, e.clientY - r.top));
     };
     const noMenu = (e: Event) => e.preventDefault();
+    // Switching away mid-touch can swallow the release.
+    const abandon = () => gestures.reset();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') abandon();
+    };
+    window.addEventListener('blur', abandon);
+    document.addEventListener('visibilitychange', onVisibility);
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas.addEventListener('pointerup', up);
@@ -187,6 +204,8 @@ export function CanvasView({ editor }: { editor: Editor }) {
       ro.disconnect();
       unsubscribe();
       cancelAnimationFrame(raf);
+      window.removeEventListener('blur', abandon);
+      document.removeEventListener('visibilitychange', onVisibility);
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up);

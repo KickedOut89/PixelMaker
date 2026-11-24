@@ -10,6 +10,8 @@ export default defineConfig({
   timeout: 15_000,
   use: {
     baseURL: 'http://localhost:4173/PixelMaker/',
+    // Sheets slide in; without this, tests can measure them mid-slide.
+    reducedMotion: 'reduce',
     launchOptions: existsSync(localChromium) ? { executablePath: localChromium } : {},
   },
   projects: [{ name: 'phone', use: { ...devices['Pixel 7'] } }],

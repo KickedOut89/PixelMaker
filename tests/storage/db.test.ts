@@ -57,3 +57,12 @@ test('scaleNearest repeats each pixel', () => {
   const out = scaleNearest(new Uint8ClampedArray([...R, ...B]), 2, 1, 2);
   expect(Array.from(out)).toEqual([...R, ...R, ...B, ...B, ...R, ...R, ...B, ...B]);
 });
+
+test('a connection the browser closed is reopened on the next use', async () => {
+  const s = createSprite('reopen', 2, 2, []);
+  await saveSprite(s);
+  const { connectionForTest } = await import('../../src/storage/db');
+  (await connectionForTest()).close(); // what Chrome does under storage pressure
+  expect((await loadSprite(s.id))?.name).toBe('reopen');
+  await saveSprite(s);
+});

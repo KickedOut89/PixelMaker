@@ -256,3 +256,5 @@ button:focus-visible, [tabindex]:focus-visible, input:focus-visible, select:focu
   font-weight: 600;
 }
 .actions .primary { flex: 2; }
+
+.secondary.danger { color: var(--danger); }

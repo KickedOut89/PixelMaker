@@ -63,11 +63,14 @@ export function App() {
 
   if (!editor) return <div data-testid="app" class="app" />;
 
-  const createNew = async (name: string, width: number, height: number) => {
+  /** Returns false, changing nothing, if the current sprite could not be saved and `discard` is not set. */
+  const createNew = async (name: string, width: number, height: number, discard: boolean): Promise<boolean> => {
     // Make sure the sprite being left is safely stored before it is replaced.
-    await autosave.current?.flush();
+    const stored = (await autosave.current?.flush()) ?? false;
+    if (!stored && !discard) return false;
     editor.loadSprite(createSprite(name, width, height, editor.state.sprite.palette));
     setSheet(null);
+    return true;
   };
 
   return (

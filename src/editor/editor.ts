@@ -1,5 +1,5 @@
-import { rgba, TRANSPARENT, type Color } from '../core/color';
-import { compositeFrame } from '../core/composite';
+import { TRANSPARENT, rgba, type Color } from '../core/color';
+import { compositePixel } from '../core/composite';
 import { History, pixelPatch } from '../core/history';
 import { copyRect, floodFill, linePoints, stamp, unionRect, type Rect } from '../core/pixels';
 import { getCel, type Cel, type Sprite } from '../core/sprite';
@@ -42,6 +42,10 @@ export class Editor {
   readonly history = new History(100);
   private listeners = new Set<() => void>();
   private stroke: ActiveStroke | null = null;
+  /** Where a fill will happen if the touch ends normally. */
+  private pendingFill: { x: number; y: number } | null = null;
+  /** The foreground colour to put back if an eyedropper touch is cancelled. */
+  private pickRestore: Color | null = null;
   private viewW = 0;
   private viewH = 0;
   private autoFit = true;
@@ -144,21 +148,18 @@ export class Editor {
     this.strokeCancel();
     const st = this.state;
     if (st.tool === 'eyedropper') {
+      this.pickRestore = st.fg;
       this.pick(x, y);
       return;
     }
     if (!this.drawable()) return;
-    const cel = getCel(st.sprite, st.layer, st.frame);
     if (st.tool === 'fill') {
-      const before = cel.data.slice();
-      const rect = floodFill(cel, x, y, st.fg, st.fillContiguous);
-      if (!rect) return;
-      this.history.push(
-        pixelPatch(LABELS.fill, st.layer, st.frame, rect, copyRect({ ...cel, data: before }, rect), copyRect(cel, rect)),
-      );
-      this.changed();
+      // Fill waits for the finger to lift, so a touch that turns out to be the
+      // start of a pinch or a multi-finger tap never fills anything.
+      this.pendingFill = { x, y };
       return;
     }
+    const cel = getCel(st.sprite, st.layer, st.frame);
     this.stroke = { tool: st.tool, cel, snapshot: cel.data.slice(), dirty: null, lastX: x, lastY: y };
     this.paint(x, y, x, y);
   }
@@ -189,7 +190,31 @@ export class Editor {
     }
   }
 
+  private fillAt(x: number, y: number): void {
+    const st = this.state;
+    const cel = getCel(st.sprite, st.layer, st.frame);
+    const before = cel.data.slice();
+    const rect = floodFill(cel, x, y, st.fg, st.fillContiguous);
+    if (!rect) return;
+    this.history.push(
+      pixelPatch(LABELS.fill, st.layer, st.frame, rect, copyRect({ ...cel, data: before }, rect), copyRect(cel, rect)),
+    );
+    this.changed();
+  }
+
+  /** True while a finger is down and drawing. */
+  get isStroking(): boolean {
+    return this.stroke !== null;
+  }
+
   strokeEnd(): void {
+    this.pickRestore = null;
+    if (this.pendingFill) {
+      const { x, y } = this.pendingFill;
+      this.pendingFill = null;
+      this.fillAt(x, y);
+      return;
+    }
     const s = this.stroke;
     if (!s) return;
     this.stroke = null;
@@ -203,6 +228,12 @@ export class Editor {
 
   /** Abandons the stroke in progress and puts the pixels back. */
   strokeCancel(): void {
+    this.pendingFill = null;
+    if (this.pickRestore !== null) {
+      const restore = this.pickRestore;
+      this.pickRestore = null;
+      this.setFg(restore);
+    }
     const s = this.stroke;
     if (!s) return;
     this.stroke = null;
@@ -215,10 +246,9 @@ export class Editor {
   pick(x: number, y: number): boolean {
     const { sprite, frame } = this.state;
     if (x < 0 || y < 0 || x >= sprite.width || y >= sprite.height) return false;
-    const d = compositeFrame(sprite, frame);
-    const i = (y * sprite.width + x) * 4;
-    if (d[i + 3] === 0) return false;
-    this.setFg(rgba(d[i], d[i + 1], d[i + 2], d[i + 3]));
+    const c = compositePixel(sprite, frame, x, y);
+    if ((c & 255) === 0) return false;
+    if (c !== this.state.fg) this.setFg(c);
     return true;
   }
 

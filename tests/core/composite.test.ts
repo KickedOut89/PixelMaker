@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compositeFrame } from '../../src/core/composite';
+import { compositeFrame, compositePixel } from '../../src/core/composite';
 import { setPixel } from '../../src/core/pixels';
 import { createSprite, createSurface, type Sprite } from '../../src/core/sprite';
 
@@ -36,4 +36,20 @@ test('missing cel is skipped', () => {
   const s = twoLayers();
   s.layers[1].cels[0] = null;
   expect(px(compositeFrame(s, 0))).toEqual([0, 0, 255, 255]);
+});
+
+test('an output buffer is reused and fully overwritten', () => {
+  const s = twoLayers();
+  const out = new Uint8ClampedArray(16).fill(77);
+  expect(compositeFrame(s, 0, out)).toBe(out);
+  expect(px(out)).toEqual([255, 0, 0, 255]);
+  expect(Array.from(out.slice(4, 8))).toEqual([0, 0, 0, 0]);
+});
+test('compositePixel matches compositeFrame', () => {
+  const s = twoLayers();
+  s.layers[1].opacity = 128;
+  const d = compositeFrame(s, 0);
+  expect(compositePixel(s, 0, 0, 0)).toBe(((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) >>> 0);
+  expect(compositePixel(s, 0, 1, 1)).toBe(0);
+  expect(compositePixel(s, 0, -1, 0)).toBe(0);
 });

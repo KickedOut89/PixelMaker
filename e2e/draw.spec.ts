@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { drawLine, openApp, paintedCount, pinch, pixelAt, spritePoint, state, tapPixel, twoFingerTap } from './helpers';
+import { drawLine, openApp, paintedCount, pinch, pixelAt, pointer, spritePoint, state, tapPixel, twoFingerTap } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openApp(page);
@@ -93,4 +93,12 @@ test('the canvas takes most of the screen', async ({ page }) => {
   const box = (await page.getByTestId('canvas').boundingBox())!;
   const vh = page.viewportSize()!.height;
   expect(box.height / vh).toBeGreaterThan(0.55);
+});
+
+test('a touch whose release was never delivered does not leave the canvas dead', async ({ page }) => {
+  const stuck = await spritePoint(page, 20, 20);
+  await pointer(page, 'pointerdown', 9, stuck); // no pointerup ever arrives for this one
+  await drawLine(page, [2, 2], [6, 2]);
+  for (let x = 2; x <= 6; x++) expect(await pixelAt(page, x, 2)).not.toBe(0);
+  expect(await pixelAt(page, 20, 20)).toBe(0);
 });

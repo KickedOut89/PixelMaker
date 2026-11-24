@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useLayoutEffect, useState } from 'preact/hooks';
 import type { Editor } from '../editor/editor';
 import { BottomSheet } from './BottomSheet';
 
@@ -12,12 +12,14 @@ interface Props {
 
 export function MenuSheet({ open, editor, onClose, onNew, onExport }: Props) {
   const [name, setName] = useState('');
-  useEffect(() => {
+  // Before paint, so the reset can never land after the user's first keystroke.
+  useLayoutEffect(() => {
     if (open) setName(editor.state.sprite.name);
   }, [open]);
 
-  const commit = () => {
-    editor.renameSprite(name);
+  // Takes the text straight from the field: state can lag a keystroke behind.
+  const commit = (text: string) => {
+    editor.renameSprite(text);
     setName(editor.state.sprite.name);
   };
 
@@ -27,7 +29,7 @@ export function MenuSheet({ open, editor, onClose, onNew, onExport }: Props) {
         <span>Name</span>
         <input data-testid="menu-rename" type="text" autoComplete="off" spellcheck={false} maxLength={60} value={name}
           onInput={(e) => setName((e.target as HTMLInputElement).value)}
-          onBlur={commit}
+          onBlur={(e) => commit((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
       </label>
       <button class="menu-item" data-testid="menu-new" onClick={onNew}>New sprite…</button>

@@ -139,6 +139,26 @@ export class GestureRecognizer {
     this.release(id, 0, true);
   }
 
+  /**
+   * Forgets every finger, rolling back any stroke in progress. For when the
+   * browser stops telling us about a touch (app switched away, lost pointer).
+   */
+  reset(): void {
+    this.disarmLongPress();
+    const wasStroke = this.mode === 'stroke';
+    const wasMulti = this.mode === 'multi';
+    this.pointers.clear();
+    this.pair = null;
+    this.mode = 'idle';
+    if (wasStroke) this.emit({ type: 'strokeCancel' });
+    if (wasMulti) this.emit({ type: 'transformEnd', cx: this.lastCx, cy: this.lastCy });
+  }
+
+  /** True while any finger is being tracked. */
+  get active(): boolean {
+    return this.pointers.size > 0;
+  }
+
   private release(id: number, t: number, cancelled: boolean): void {
     if (!this.pointers.delete(id)) return;
     if (this.mode === 'stroke') {

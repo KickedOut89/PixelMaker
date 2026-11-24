@@ -28,7 +28,20 @@ function open(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(SPRITES)) db.createObjectStore(SPRITES, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // The browser can close the connection under us (storage pressure, site
+        // data cleared, another tab upgrading). Forget it so the next use reopens.
+        const forget = () => {
+          dbPromise = null;
+        };
+        db.onclose = forget;
+        db.onversionchange = () => {
+          db.close();
+          forget();
+        };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
       req.onblocked = () => reject(new Error('Storage is blocked by another tab'));
     });
@@ -40,10 +53,23 @@ function open(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+/** Test hook: the live connection, so a test can close it the way a browser might. */
+export function connectionForTest(): Promise<IDBDatabase> {
+  return open();
+}
+
 async function run<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await open();
+  let db = await open();
+  let tx: IDBTransaction;
+  try {
+    tx = db.transaction(store, mode);
+  } catch {
+    // The connection was closed without telling us. Reopen once and try again.
+    dbPromise = null;
+    db = await open();
+    tx = db.transaction(store, mode);
+  }
   return new Promise<T>((resolve, reject) => {
-    const tx = db.transaction(store, mode);
     const req = fn(tx.objectStore(store));
     tx.oncomplete = () => resolve(req.result);
     tx.onerror = () => reject(tx.error);
