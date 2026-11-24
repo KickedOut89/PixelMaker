@@ -179,3 +179,23 @@ describe('state', () => {
     expect(ed.state.sprite.palette).toEqual([RED]);
   });
 });
+
+describe('view', () => {
+  test('fits the sprite when the view size is first known and on request', () => {
+    ed.setViewSize(360, 500);
+    expect(ed.state.viewport).toEqual({ zoom: 20, panX: 20, panY: 90 });
+    ed.moveViewport({ zoom: 7, panX: 1, panY: 2 });
+    ed.setViewSize(360, 400);
+    expect(ed.state.viewport).toEqual({ zoom: 7, panX: 1, panY: 2 });
+    ed.fitView();
+    expect(ed.state.viewport).toEqual({ zoom: 20, panX: 20, panY: 40 });
+    ed.setViewSize(360, 500);
+    expect(ed.state.viewport).toEqual({ zoom: 20, panX: 20, panY: 90 });
+  });
+  test('loading a sprite refits the view', () => {
+    ed.setViewSize(360, 500);
+    ed.moveViewport({ zoom: 3, panX: 0, panY: 0 });
+    ed.loadSprite(createSprite('b', 32, 32, []));
+    expect(ed.state.viewport).toEqual({ zoom: 10, panX: 20, panY: 90 });
+  });
+});

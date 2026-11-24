@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   reporter: 'line',
+  timeout: 15_000,
   use: {
     baseURL: 'http://localhost:4173/PixelMaker/',
     launchOptions: existsSync(localChromium) ? { executablePath: localChromium } : {},

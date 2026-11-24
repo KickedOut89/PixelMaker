@@ -3,7 +3,7 @@ import { compositeFrame } from '../core/composite';
 import { History, pixelPatch } from '../core/history';
 import { copyRect, floodFill, linePoints, stamp, unionRect, type Rect } from '../core/pixels';
 import { getCel, type Cel, type Sprite } from '../core/sprite';
-import type { Viewport } from './viewport';
+import { fit, type Viewport } from './viewport';
 
 export type ToolId = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 
@@ -42,6 +42,9 @@ export class Editor {
   readonly history = new History(100);
   private listeners = new Set<() => void>();
   private stroke: ActiveStroke | null = null;
+  private viewW = 0;
+  private viewH = 0;
+  private autoFit = true;
 
   constructor(sprite: Sprite) {
     this.state = {
@@ -105,6 +108,30 @@ export class Editor {
   setViewport(v: Viewport): void {
     this.state.viewport = v;
     this.notify();
+  }
+
+  /** A pan or zoom made by the user; stops the view from re-fitting itself. */
+  moveViewport(v: Viewport): void {
+    this.autoFit = false;
+    this.setViewport(v);
+  }
+
+  /** Tells the editor how big the on-screen canvas area is, in CSS pixels. */
+  setViewSize(w: number, h: number): void {
+    this.viewW = w;
+    this.viewH = h;
+    if (this.autoFit) this.applyFit();
+  }
+
+  /** Centres the sprite at the largest whole zoom that fits. */
+  fitView(): void {
+    this.autoFit = true;
+    this.applyFit();
+  }
+
+  private applyFit(): void {
+    if (this.viewW <= 0 || this.viewH <= 0) return;
+    this.setViewport(fit(this.state.sprite.width, this.state.sprite.height, this.viewW, this.viewH));
   }
 
   private drawable(): boolean {
@@ -211,6 +238,8 @@ export class Editor {
     this.state.layer = 0;
     this.state.frame = 0;
     this.history.clear();
+    this.autoFit = true;
+    this.applyFit();
     this.changed();
   }
 
